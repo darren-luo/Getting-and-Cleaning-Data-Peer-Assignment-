@@ -1,0 +1,110 @@
+---
+title: "Code Book"
+output: run_analaysis.R
+---
+GitHub contains a code book that modifies and updates the available codebooks with the data to indicate all the variables and summaries calculated, along with units, and any other relevant information.
+
+
+## Project Description
+run_analysis.R reads the raw .txt files and processes them such that a final tidy dataset is returned as required by the assignment
+
+## Collection of raw data and variables created when reading data
+
+The provided raw .txt files were read into R using read.table and converted into tbl_df format. The follwing 8 variables were created in the process:
+
+1) features_labels: data frame containing data from features.txt
+2) activity_labels: data frame containing data from activity_labels.txt
+3) test_subjects: data frame containing data from test/subject_test.txt. Columns renamed to "Subject" via read.table() col.names argument
+4) test_labels: data frame containing data from test/y_test.txt. Columns renamed to "Activty" via read.table() col.names argument
+5) test_data: data frame containing data from test/X_test.txt. Columns renamed according to labels in features_label
+6) training_subjects: data frame containing data from train/subject_train.txt. Columns renamed to "Subject" via read.table() col.names argument
+7) training_labels: data frame containing data from train/y_train.txt.olumns renamed to "Activty" via read.table() col.names argument
+8) training_data: data frame containing data from train/X_train.txt. Columns renamed according to labels in features_label
+
+The code for reading hte raw files are:
+    
+    features_labels <- tbl_df(read.table("./features.txt", header = FALSE, sep = "", stringsAsFactors = FALSE, check.names = FALSE))
+    activity_labels <- tbl_df(read.table("./activity_labels.txt", header = FALSE, sep = "", stringsAsFactors = FALSE, col.names= c("Activity", "Activity Description")))
+    test_subjects <- tbl_df(read.table("./test/subject_test.txt", header = FALSE, col.names = "Subject")) 
+    test_labels <- tbl_df(read.table("./test/y_test.txt", header = FALSE, col.names = "Activity"))
+    test_data <- tbl_df(read.table("./test/x_test.txt", header = FALSE, sep = "", col.names = as.list(features_labels$V2)))
+    training_subjects <- tbl_df(read.table("./train/subject_train.txt", header = FALSE, col.names = "Subject"))
+    training_labels <- tbl_df(read.table("./train/y_train.txt", header = FALSE, col.names = "Activity"))
+    training_data <- tbl_df(read.table("./train/x_train.txt", header = FALSE, sep = "", col.names = as.list(features_labels$V2)))
+
+## Creating the tidy data file
+There are several steps to get to the final output. The first involves extracting the right columns. The assumption here is that the columns asrranged in the test_data and training_data are in the same order as that listed in features_labels
+
+The following variables were creating using the grep() function to extract columns from features_labels which has 561 rows.
+
+1) means_col: An integer vector of length 53 containing row positions in features_labels that contain 'Mean' in the labels.
+2) std_col: An integer vector of length 33 containing row positions in features_labels that contain 'stf' in the labels
+    
+The code for this step is as follows:
+
+    means_col <- grep("[Mm]ean", features_labels$V2, value = T) 
+    std_col <- grep("std()", features_labels$V2, value = T) 
+
+After these variables are created, we check that there are no duplicates using unique(). The next step is to extract the colums using select() function in dply and passing the the means_col and std_col vector from test_data and training_data respectively as arguments into select(). We update the test_data and training_data variables in the process. 
+
+test_data is now a 2947 x 86 dataframe and training_data is a 7352 x 86 dataframe
+
+The code for this step is as follows:
+
+    test_data <- select(test_data, means_col, std_col) 
+    training_data <- select(training_data, means_col, std_col)
+
+The next step is to update the training_labels and test_labels with meaningful activity names. This is done via a left_join() with the activity_labels data
+
+The code for this step is as follows:
+
+    training_labels <- left_join(training_labels, activity_labels)
+    test_labels <- left_join(test_labels, activity_labels)
+
+After all the activity labels have been assigned, we then merged the subject, activity labels and data columns together and introduce a new column to indicate the origins of hte data - i.e. did the data come from the "test" or "training" set". This is done via a bind_cols() function followed by a mutate() to add the new column. test_dataset and training_dataset are also updated in the process. This results in two new variables
+
+1) test_dataset: 2947 x 89 data frame
+2) trianing_dataset: 7352 x 89 data frame
+
+The code for this step is as follows:
+    
+    test_dataset <- bind_cols(bind_cols(test_subjects, test_labels[,2]) %>% mutate(Dataset = "test"), test_data)
+    training_dataset <- bind_cols(bind_cols(training_subjects, training_labels[,2]) %>% mutate(Dataset = "training"), training_data)
+    
+The columns containing the measurement data are now binded with the subject, acitvity and dataset and we have two separate sets of complete (but not tidy) data for the training and test sets. These two sets now need to be merged together via a bind_rows function. Since both test_dataset and training_dataset have the same number of columns arranged in the same way, we can use a bind_rows() to merge both sets.
+
+We assign a new varaible merged_dataset, a 10,299 x 89 dataframe to the rbind() function. The code is a follows:
+
+    merged_dataset <- bind_rows(test_dataset, training_dataset) 
+
+Now that the datasets have been merged and the activity labels have been assigned, we need to give the measurement variables more meaningful names (i.e. change the column names) - 86 columns in total. The code is as follows: (the rationale and steps can be found in the separate readme.MD file)
+
+    names(merged_dataset) <- sub("\\.\\.\\.", " ", names(merged_dataset))
+    names(merged_dataset) <- sub("\\.\\.", " ", names(merged_dataset))
+    names(merged_dataset) <- sub("\\.", " ", names(merged_dataset))
+    names(merged_dataset) <- sub("\\.$", "", names(merged_dataset))
+    names(merged_dataset) <- sub("X", "X Axis", names(merged_dataset))
+    names(merged_dataset) <- sub("Y", "Y Axis", names(merged_dataset))
+    names(merged_dataset) <- sub("Z", "Z Axis", names(merged_dataset))
+    names(merged_dataset) <- sub("Freq", "(Weighted Average)", names(merged_dataset))
+    names(merged_dataset) <- sub("BodyBody", "Body", names(merged_dataset))
+    names(merged_dataset) <- sub("^fBody", "Frequency: Body-", names(merged_dataset))
+    names(merged_dataset) <- sub("^tBody|tBody", "Time: Body-", names(merged_dataset))
+    names(merged_dataset) <- sub("^tGravity", "Time: Gravity-", names(merged_dataset))
+    names(merged_dataset) <- sub("gravityMean|\\.gravity", "", names(merged_dataset))
+    names(merged_dataset) <- sub("Mean", " mean", names(merged_dataset))
+    names(merged_dataset) <- sub("Mean", "", names(merged_dataset))
+    names(merged_dataset) <- sub("angle", "Angle\\(\\)", names(merged_dataset))
+    names(merged_dataset) <- sub("Mag", " Magnitude", names(merged_dataset))
+    names(merged_dataset) <- sub("Jerk", " Jerk", names(merged_dataset))
+    names(merged_dataset) <- sub(" $", "", names(merged_dataset))
+    names(merged_dataset) <- sub("\\.$", "", names(merged_dataset))
+
+The final step in the process is to summarise the data to get it into a tidy data format. This is acheived by first grouping the data by subject, activity type and dataset origin using a group_by() function. This produces a 10,299 x 89 frame which has 180 groups (6 activity types x 30 subjects).
+
+A summarise_all() function is then applied to the grouped data frame to produce the final tidy data which is a 180 x 89 data frame.
+
+The code for this step is follows:
+
+    merged_dataset_tidy <- group_by(merged_dataset, Subject, `Activity Description`, Dataset) %>% summarise_all(funs(mean))
+    print(merged_dataset_tidy)
