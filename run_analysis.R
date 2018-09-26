@@ -16,7 +16,7 @@
     training_labels <- tbl_df(read.table("./train/y_train.txt", header = FALSE, col.names = "Activity"))
     training_data <- tbl_df(read.table("./train/x_train.txt", header = FALSE, sep = "", col.names = as.list(features_labels$V2)))
 
-## Determin the columns that need to be extracted - mean and std measures, and checks if these columns are unique and are not duplicated  within the respective subset
+## Determine the columns that need to be extracted - mean and std measures, and checks if these columns are unique and are not duplicated  within the respective subset
     means_col <- grep("[Mm]ean", features_labels$V2, value = T) ## columns which contain mean values
     std_col <- grep("std()", features_labels$V2, value = T) ## columns that contain std values
     
@@ -34,7 +34,7 @@
     test_data <- select(test_data, means_col, std_col)
     training_data <- select(training_data, means_col, std_col)
 
-## Add activity description to activity numbers - Qns 3)
+## Add activity description to activity numbers - Qns 3) by matching them against activity_labels.txt fil
     training_labels <- left_join(training_labels, activity_labels)
     test_labels <- left_join(test_labels, activity_labels)
         
@@ -49,9 +49,6 @@
 
 ## To give the variables meanigngful names - we can first identify the 'structure' of the names - there are 3 diff types of measurements: 1) acceeleration type (body/gyro) by domain by axis by stat. measure 2) two derivatives of #1, Jerk measurements and magnitude by acceleration type by domain by axis by stat. measure 3) Average Values of signal type (5 types -  bodyacc, bodyaccjerk, bodygyro, bodygyrojerk, gravity) 
 ## First step is to sub out ellipsis - there are 3 categories or ellipsis each of different lengths  "...", "..", "." - each of these need to be replaced by spaces
-## the order of the commands is important!
-    print(names(merged_dataset))
-   
     names(merged_dataset) <- sub("\\.\\.\\.", " ", names(merged_dataset))
     names(merged_dataset) <- sub("\\.\\.", " ", names(merged_dataset))
     names(merged_dataset) <- sub("\\.", " ", names(merged_dataset))
@@ -60,7 +57,7 @@
     names(merged_dataset) <- sub("X", "X Axis", names(merged_dataset))
     names(merged_dataset) <- sub("Y", "Y Axis", names(merged_dataset))
     names(merged_dataset) <- sub("Z", "Z Axis", names(merged_dataset))
-    names(merged_dataset) <- sub("Freq", "", names(merged_dataset))
+    names(merged_dataset) <- sub("Freq", "(Weighted Average)", names(merged_dataset))
     names(merged_dataset) <- sub("BodyBody", "Body", names(merged_dataset))
     names(merged_dataset) <- sub("^fBody", "Frequency: Body-", names(merged_dataset))
     names(merged_dataset) <- sub("^tBody|tBody", "Time: Body-", names(merged_dataset))
@@ -75,10 +72,8 @@
     names(merged_dataset) <- sub(" $", "", names(merged_dataset))
     names(merged_dataset) <- sub("\\.$", "", names(merged_dataset))
     
+## Summarize Tidy data set by grouping by subject and activity  
     
-    
-    
+    merged_dataset_tidy <- group_by(merged_dataset, Subject, `Activity Description`, Dataset) %>% summarise_all(funs(mean))
+    print(merged_dataset_tidy)
 
-
-## need to convert all dbl #s into numeric format so that we can calculate means
-## 
